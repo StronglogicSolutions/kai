@@ -1,13 +1,18 @@
 cmake_minimum_required(VERSION 3.0)
+set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard")
+
 project(kai)
 
-# Find ZeroMQ
-find_package(ZMQ REQUIRED)
-include_directories(${ZMQ_INCLUDE_DIRS})
+find_package(fmt CONFIG REQUIRED)
+set(KLOGGER "${CMAKE_SOURCE_DIR}/third_party/klogger/build/libklog.a")
 
 # Find libcurl
 find_package(CURL REQUIRED)
 include_directories(${CURL_INCLUDE_DIRS})
+
+include_directories(
+  third_party/klogger/src
+)
 
 # Add your source files here
 set(SOURCES
@@ -15,7 +20,7 @@ set(SOURCES
 )
 
 # Add executable
-add_executable(my_program ${SOURCES})
+add_executable(${PROJECT_NAME} ${SOURCES})
 
 # Link libraries
-target_link_libraries(my_program ${ZMQ_LIBRARIES} ${CURL_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} zmq curl fmt::fmt ${KLOGGER})
