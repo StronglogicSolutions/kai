@@ -12,11 +12,14 @@ include_directories(${CURL_INCLUDE_DIRS})
 
 include_directories(
   third_party/klogger/src
+  third_party/kutils/include
+  third_party/simdjson/singleheader
 )
 
 # Add your source files here
 set(SOURCES
   src/main.cpp
+  third_party/simdjson/singleheader/simdjson.cpp
 )
 
 # Add executable
