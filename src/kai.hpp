@@ -55,7 +55,7 @@ class kai
       for (const auto& exchange : session.dialogue)
         klog().d(
           "\n─────────────────────────────────────────────────────────────────────────────\
-           \nSession {}\n\nQUERY\n\n{}\n\nRESPONSE\n\n{}\
+           \nSession {}\n\nQUERY: {}\n☰☰☰☰☰☰\nRESPONSE:\n\n{}\
            \n─────────────────────────────────────────────────────────────────────────────",
           id, exchange.first, exchange.second);
   }
