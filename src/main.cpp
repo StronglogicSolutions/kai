@@ -6,6 +6,12 @@
 using namespace kiq::log;
 
 static const uint32_t g_id = 123;
+
+bool
+is_cmd(std::string_view s, std::string_view cmd)
+{
+  return (s.find(cmd) == 0);
+}
 //--------------------------------------------------------
 //-----------MAIN-----------------------------------------
 //--------------------------------------------------------
@@ -13,28 +19,23 @@ int main(int argc, char** argv)
 {
   std::string input;
 
-  klogger::init("kai", "debug");
+  klogger::init("kai", "trace");
 
   kai ai;
 
-  ai.add(g_id);
-
-  set_handler([&ai] (const auto& query, const auto& response)
-  {
-    ai.add(g_id, { query, response });
-  });
+  set_handler([&ai] (const auto& query, const auto& response) { ai.add(g_id, { query, response }); });
 
   for (;;)
   {
-    klog().i("\nPrompt: ");
+    klog().i("\n\nPrompt:");
     std::getline(std::cin, input);
-    if (input.find("exit") == 0)
+    if (is_cmd(input, "exit"))
       break;
+    if (is_cmd(input, "print"))
+      ai.print();
 
     post(input, url);
   }
-
-  ai.print();
 
   return 0;
 }
