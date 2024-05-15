@@ -31,9 +31,8 @@ class kai
   void add(uint32_t id, const session::exchange_t& exchange)
   {
     if (!has_session(id))
-      klog().w("Can't add exchange: session {} doesn't exist", id);
-    else
-      sessions_.at(id).dialogue.push_back(exchange);
+      add(id);
+    sessions_.at(id).dialogue.push_back(exchange);
   }
   //-----------------------------------------------------------------------------
   session::exchange_t
@@ -54,7 +53,11 @@ class kai
   {
     for (const auto& [id, session] : sessions_)
       for (const auto& exchange : session.dialogue)
-        klog().d("Session {}\nQuery: {}\nResponse: {}\n\n", id, exchange.first, exchange.second);
+        klog().d(
+          "\n─────────────────────────────────────────────────────────────────────────────\
+           \nSession {}\n\nQUERY\n\n{}\n\nRESPONSE\n\n{}\
+           \n─────────────────────────────────────────────────────────────────────────────",
+          id, exchange.first, exchange.second);
   }
  private:
   //-----------------------------------------------------------------------------
