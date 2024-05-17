@@ -13,6 +13,7 @@ include_directories(${CURL_INCLUDE_DIRS})
 include_directories(
   third_party/klogger/src
   third_party/kutils/include
+  third_party/kproto/include
   third_party/simdjson/singleheader
 )
 

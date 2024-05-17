@@ -1,8 +1,10 @@
+#pragma once
+
 #include <map>
 #include <string>
 #include <vector>
 #include <exception>
-#include <logger.hpp>
+#include "endpoint.hpp"
 
 using namespace kiq::log;
 
@@ -19,6 +21,14 @@ using sessions_t = std::map<uint32_t, session>;
 class kai
 {
  public:
+
+  kai()
+  : endpoint_([this](kiq::ipc_message::u_ipc_msg_ptr msg)
+  {
+    klog().t("Message received:\n{}", msg->to_string());
+  })
+  {}
+
   //-----------------------------------------------------------------------------
   void add(uint32_t id)
   {
@@ -65,5 +75,5 @@ class kai
 
   //--------------------------
   sessions_t sessions_;
-
+  endpoint   endpoint_;
 };
