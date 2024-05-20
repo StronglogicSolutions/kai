@@ -5,9 +5,36 @@
 #include <curl/curl.h>
 #include <logger.hpp>
 #include <simdjson.h>
+#include <kutils.hpp>
+
 //--------------------------------------------------------
 using namespace kiq::log;
 using curl_t = CURL;
+
+struct ai_payload_t
+{
+  ai_payload_t() {}
+
+  void
+  push(std::string_view v)
+  {
+    std::string&& s = v.data();
+    klog().d("Pushing back {}", s);
+    values.emplace_back(std::move(s));
+  }
+
+  std::string type()
+  {
+    return values.at(0);
+  }
+
+  std::string query()
+  {
+    return values.at(1);
+  }
+
+  std::vector<std::string> values;
+};
 //--------------------------------------------------------
 namespace
 {
@@ -19,8 +46,6 @@ void set_handler(handler_t handler)
 {
   g_handler = handler;
 }
-//--------------------------------------------------------
-static const char* url = "http://127.0.0.1:8080/completion"; // LLAMA AI SERVER
 //--------------------------------------------------------
 //--------------HELPERS-----------------------------------
 //--------------------------------------------------------
@@ -43,7 +68,7 @@ decode(const std::string& response)
 {
   const size_t                       i_sz = response.size();
   const size_t                       size = i_sz + simdjson::SIMDJSON_PADDING;
-  const auto                         data = simdjson::padded_string{response.data(), response.size()};
+  const auto                         data = simdjson::padded_string{response.data(), i_sz};
 
         std::string                  ret;
 
@@ -58,6 +83,30 @@ decode(const std::string& response)
   return ret;
 }
 //--------------------------------------------------------
+ai_payload_t
+get_payload(const std::string& response)
+{
+  auto s = response;
+  std::replace_if(s.begin(), s.end(), [](auto c) { return c == '\"'; } , '"');
+
+  const size_t                       i_sz = response.size();
+  const size_t                       size = i_sz + simdjson::SIMDJSON_PADDING;
+  const auto                         data = simdjson::padded_string{s.data(), s.size()};
+
+        simdjson::ondemand::parser   parser;
+        simdjson::ondemand::document doc = parser.iterate(data);
+
+        std::string                  value;
+        ai_payload_t                 ret;
+
+  for (auto arg : doc["args"].get_array())
+  {
+    value = arg.get_string().value();
+    ret.push(value);
+  }
+
+  return ret;
+}
 // Using curl
 void
 post(std::string_view query, std::string_view url)

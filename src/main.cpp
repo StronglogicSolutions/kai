@@ -1,6 +1,5 @@
 #include "helpers.hpp"
 #include "kai.hpp"
-#include <kutils.hpp>
 
 //--------------------------------------------------------
 using namespace kiq::log;
@@ -34,7 +33,7 @@ int main(int argc, char** argv)
     if (is_cmd(input, "print"))
       ai.print();
 
-    post(input, url);
+    ai.generate(input);
   }
 
   return 0;
