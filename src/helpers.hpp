@@ -44,6 +44,20 @@ make_query(const std::string& s)
   return R"({"prompt": "')" + s + R"('"})";
 }
 //--------------------------------------------------------
+std::string
+get_sanitized_string(std::string_view s)
+{
+  std::string ret;
+  for (char c : s)
+  {
+    if (c == '\n')
+      ret += "\\n";
+    else
+      ret += c;
+  }
+  return ret;
+}
+//--------------------------------------------------------
 size_t
 callback(void *contents, size_t size, size_t nmemb, std::string *buffer)
 {
@@ -75,6 +89,7 @@ decode(const std::string& response)
 ai_payload_t
 get_payload(const std::string& response)
 {
+  klog().t("Getting payload from:\n{}", response);
   auto s = response;
   std::replace_if(s.begin(), s.end(), [](auto c) { return c == '\"'; } , '"');
 
@@ -88,10 +103,11 @@ get_payload(const std::string& response)
         std::string                  value;
         ai_payload_t                 ret;
 
-  for (auto arg : doc["args"].get_array())
+  auto i = 0;
+  for (std::string_view arg : doc["args"].get_array())
   {
-    value = arg.get_string().value();
-    ret.push(value);
+    klog().t("From args array: {}", arg.data());
+    ret.push(arg);
   }
 
   return ret;
@@ -101,7 +117,7 @@ std::string
 post(std::string_view query, std::string_view url)
 {
   std::string response;
-  const auto  data = make_query(query.data());
+  const auto  data = make_query(get_sanitized_string(query));
   if (curl_t *curl = curl_easy_init(); curl)
   {
     struct curl_slist* headers  = nullptr;

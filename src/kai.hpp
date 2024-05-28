@@ -33,8 +33,9 @@ class kai
 
     static const auto last_msg_idx = std::to_string(std::numeric_limits<uint32_t>::max());
 
-    klog().t("Message received:\n{}", msg->to_string());
+    klog().t("Message received: {}", msg->to_string());
 
+    // ☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰Request Handlers☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰
     const auto handler = handler_t
     {
       { kiq::constants::IPC_KIQ_MESSAGE,  [this](auto&& ipc_msg)
@@ -52,16 +53,10 @@ class kai
       },
       { kiq::constants::IPC_PLATFORM_TYPE,  [this](auto&& ipc_msg)
         {
-          const auto p_msg   = static_cast<kiq::platform_message*>(ipc_msg.get());
-          const auto payload = get_payload(p_msg->args());
-
-          if (payload.type() == "generate")
-          {
-            generate(payload.data());
-            messages_.insert_or_assign(p_msg->id(), std::move(ipc_msg));
-          }
-          else
-            klog().w("Received unknown request name: {}", payload.type());
+          const auto p_msg = static_cast<kiq::platform_message*>(ipc_msg.get());
+          generate(p_msg->content(), p_msg->id());
+          messages_.insert_or_assign(p_msg->id(), std::move(ipc_msg));
+          // TODO: The stored message should have the name of the destination platform
         }
       },
       { kiq::constants::IPC_STATUS,       [this](auto&& ipc_msg)
@@ -71,7 +66,7 @@ class kai
         }
       },
     };
-
+    // ☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰
     try
     {
       handler.at(msg->type())(std::move(msg));
@@ -81,33 +76,24 @@ class kai
       klog().e("Caught exception while handling IPC: {}", e.what());
     }
   })
-  {}
+  {
+    endpoint_.run();
+  }
 
   //-----------------------------------------------------------------------------
   void add(std::string_view id, const session::exchange_t& exchange)
   {
+    using info_t = kiq::platform_info;
+
     if (!has_session(g_id))
       sessions_.insert({g_id, session{}});
     sessions_.at(g_id).dialogue.push_back(exchange);
 
-    const auto ipc_msg = messages_.at(id.data()).get();
+    auto&& out_msg = std::make_unique<info_t>("sentinel", exchange.second, "generated", id.data());
+    // TODO: Do we need to set platform name here? or can KIQ determine that from a request map?
+    klog().i("Sending {} this IPC: {}", endpoint_.get_addr(), out_msg->to_string());
 
-    endpoint_.send_ipc_message(std::make_unique<kiq::platform_info>(
-      "kai",
-      std::string{exchange.first + "\n\n" + exchange.second},
-      "generated"));
-  }
-  //-----------------------------------------------------------------------------
-  void
-  print() const
-  {
-    for (const auto& [id, session] : sessions_)
-      for (const auto& exchange : session.dialogue)
-        klog().d(
-          "\n─────────────────────────────────────────────────────────────────────────────\
-           \nSession {}\n\nQUERY: {}\n☰☰☰☰☰☰\nRESPONSE:\n\n{}\
-           \n─────────────────────────────────────────────────────────────────────────────",
-          id, exchange.first, exchange.second);
+    endpoint_.send_ipc_message(std::move(out_msg));
   }
   //-----------------------------------------------------------------------------
   void generate(std::string_view s, std::string_view id = "")
