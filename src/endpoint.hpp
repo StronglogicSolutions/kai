@@ -33,8 +33,6 @@ class endpoint : public kiq::IPCTransmitterInterface
 
     connect();
 
-    fut_ = std::async(std::launch::async, [this] { run(); });
-
     kiq::set_log_fn([](const auto& s) { klog().i("{}", s); });
   }
   //--------------------------------------------------------
@@ -111,7 +109,6 @@ class endpoint : public kiq::IPCTransmitterInterface
   void on_done() final { klog().t("IPC message sent"); }
 
  private:
-  std::future<void> fut_;
   zmq::context_t    context_;
   zmq::socket_t     rx_;
   zmq::socket_t     tx_;
