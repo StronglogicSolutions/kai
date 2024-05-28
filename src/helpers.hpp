@@ -23,29 +23,18 @@ struct ai_payload_t
     values.emplace_back(std::move(s));
   }
 
-  std::string type()
+  std::string type() const
   {
     return values.at(0);
   }
 
-  std::string query()
+  std::string data() const
   {
     return values.at(1);
   }
 
   std::vector<std::string> values;
 };
-//--------------------------------------------------------
-namespace
-{
-  using handler_t = std::function<void(std::string, std::string)>;
-  handler_t g_handler = nullptr;
-}
-//--------------------------------------------------------
-void set_handler(handler_t handler)
-{
-  g_handler = handler;
-}
 //--------------------------------------------------------
 //--------------HELPERS-----------------------------------
 //--------------------------------------------------------
@@ -107,14 +96,14 @@ get_payload(const std::string& response)
 
   return ret;
 }
-// Using curl
-void
+//--------------------------------------------------------
+std::string
 post(std::string_view query, std::string_view url)
 {
-  const auto data = make_query(query.data());
+  std::string response;
+  const auto  data = make_query(query.data());
   if (curl_t *curl = curl_easy_init(); curl)
   {
-           std::string response;
     struct curl_slist* headers  = nullptr;
                        headers  = curl_slist_append(headers, "Content-Type: application/json");
     curl_easy_setopt(curl, CURLOPT_URL,           url.data ());
@@ -129,7 +118,6 @@ post(std::string_view query, std::string_view url)
     {
       klog().d("Received response from AI");
       klog().t("{}", response);
-      g_handler(query.data(), decode(response));
     }
 
     curl_easy_cleanup  (curl);
@@ -137,4 +125,6 @@ post(std::string_view query, std::string_view url)
   }
   else
     klog().e("Failed to initialize libcurl");
+
+  return response;
 }

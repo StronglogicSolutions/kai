@@ -4,8 +4,6 @@
 //--------------------------------------------------------
 using namespace kiq::log;
 
-static const uint32_t g_id = 123;
-
 bool
 is_cmd(std::string_view s, std::string_view cmd)
 {
@@ -21,8 +19,6 @@ int main(int argc, char** argv)
   klogger::init("kai", "trace");
 
   kai ai;
-
-  set_handler([&ai] (const auto& query, const auto& response) { ai.add(g_id, { query, response }); });
 
   for (;;)
   {
