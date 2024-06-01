@@ -73,15 +73,23 @@ decode(const std::string& response)
   const size_t                       size = i_sz + simdjson::SIMDJSON_PADDING;
   const auto                         data = simdjson::padded_string{response.data(), i_sz};
 
-        std::string                  ret;
+        std::string                  raw;
 
         simdjson::ondemand::parser   parser;
         simdjson::ondemand::document doc = parser.iterate(data);
 
-  if (ret = std::string(doc["content"].get_string().value()); ret.empty())
+  if (raw = std::string(doc["content"].get_string().value()); raw.empty())
     klog().e("Failed to parse content");
   else
-    klog().i("Content: {}", ret);
+    klog().i("Content: {}", raw);
+
+  std::string ret;
+
+  for (char c : raw)
+    if (c == '\n')
+      ret += "%0A";
+    else
+      ret += c;
 
   return ret;
 }
