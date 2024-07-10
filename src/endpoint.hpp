@@ -13,24 +13,9 @@ class endpoint : public kiq::IPCTransmitterInterface
 {
  public:
   endpoint(ipc_msg_cb_t cb)
-  : context_{1},
-  rx_(context_, ZMQ_ROUTER),
-  tx_(context_, ZMQ_DEALER),
+  : context_(1),
   on_recv_(cb)
   {
-    rx_.set(zmq::sockopt::linger, 0);
-    tx_.set(zmq::sockopt::linger, 0);
-    rx_.set(zmq::sockopt::routing_id, "kai_daemon");
-    tx_.set(zmq::sockopt::routing_id, "kai");
-    rx_.set(zmq::sockopt::tcp_keepalive, 1);
-    tx_.set(zmq::sockopt::tcp_keepalive, 1);
-    rx_.set(zmq::sockopt::tcp_keepalive_idle,  300);
-    tx_.set(zmq::sockopt::tcp_keepalive_idle,  300);
-    rx_.set(zmq::sockopt::tcp_keepalive_intvl, 300);
-    tx_.set(zmq::sockopt::tcp_keepalive_intvl, 300);
-
-    rx_.bind(RX_ADDR);
-
     connect();
 
     kiq::set_log_fn([](const auto& s) { klog().i("{}", s); });
@@ -49,12 +34,25 @@ class endpoint : public kiq::IPCTransmitterInterface
   //--------------------------------------------------------
   void connect()
   {
-    if (connected_)
-      tx_.disconnect(TX_ADDR);
+    rx_ = zmq::socket_t(context_, ZMQ_ROUTER);
+    tx_ = zmq::socket_t(context_, ZMQ_DEALER);
 
+    rx_.set(zmq::sockopt::linger, 0);
+    tx_.set(zmq::sockopt::linger, 0);
+    rx_.set(zmq::sockopt::routing_id, "kai_daemon");
+    tx_.set(zmq::sockopt::routing_id, "kai");
+    rx_.set(zmq::sockopt::tcp_keepalive, 1);
+    tx_.set(zmq::sockopt::tcp_keepalive, 1);
+    rx_.set(zmq::sockopt::tcp_keepalive_idle,  300);
+    tx_.set(zmq::sockopt::tcp_keepalive_idle,  300);
+    rx_.set(zmq::sockopt::tcp_keepalive_intvl, 300);
+    tx_.set(zmq::sockopt::tcp_keepalive_intvl, 300);
+
+    rx_.bind   (RX_ADDR);
     tx_.connect(TX_ADDR);
-    connected_ = true;
+
     klog().d("Sending greeting to {}", get_addr());
+
     send_ipc_message(std::make_unique<kiq::status_check>());
   }
   //--------------------------------------------------------
@@ -106,12 +104,11 @@ class endpoint : public kiq::IPCTransmitterInterface
 
  protected:
   virtual zmq::socket_t& socket() final { return tx_; }
-  void on_done() final { klog().t("IPC message sent"); }
+  void on_done() final { (void)(0); }
 
  private:
   zmq::context_t    context_;
   zmq::socket_t     rx_;
   zmq::socket_t     tx_;
   ipc_msg_cb_t      on_recv_;
-  bool              connected_{false};
 };
