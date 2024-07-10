@@ -104,7 +104,7 @@ class endpoint : public kiq::IPCTransmitterInterface
 
  protected:
   virtual zmq::socket_t& socket() final { return tx_; }
-  void on_done() final { klog().t("IPC message sent"); }
+  void on_done() final { (void)(0); }
 
  private:
   zmq::context_t    context_;
