@@ -12,6 +12,8 @@ static const char* url = "http://127.0.0.1:8080/completion"; // LLAMA AI SERVER
 //--------------------------------------------------------
 static const uint32_t g_id = 123;
 //--------------------------------------------------------
+const auto make_hb = [] { return std::make_unique<kiq::keepalive>(); };
+//--------------------------------------------------------
 struct session
 {
   using exchange_t = std::pair<std::string, std::string>;
@@ -32,8 +34,8 @@ class kai
     using handler_t = std::map<uint8_t, std::function<void(kiq::ipc_message::u_ipc_msg_ptr)>>;
 
     static const auto last_msg_idx = std::to_string(std::numeric_limits<uint32_t>::max());
-
-    klog().t("Message received: {}", msg->to_string());
+    if (msg->type() > kiq::constants::IPC_KEEPALIVE_TYPE)
+      klog().t("Message received: {}", msg->to_string());
 
     // ☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰Request Handlers☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰
     const auto handler = handler_t
@@ -61,10 +63,25 @@ class kai
       },
       { kiq::constants::IPC_STATUS,       [this](auto&& ipc_msg)
         {
+          klog().d("Received IPC_STATUS. Reconnecting");
           endpoint_.send_ipc_message(std::make_unique<kiq::okay_message>());
           endpoint_.connect();
         }
       },
+      { kiq::constants::IPC_KEEPALIVE_TYPE,       [this](auto&&)
+        {
+          static unsigned int hb_count = 0;
+          if (++hb_count % 400 == 0)
+            klog().t("Heartbeats: {}", hb_count);
+
+          endpoint_.send_ipc_message(make_hb());
+        }
+      },
+      { kiq::constants::IPC_OK_TYPE,       [this](auto&&)
+        {
+          klog().d("Received OKAY from KIQ");
+        }
+      }
     };
     // ☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰
     try
