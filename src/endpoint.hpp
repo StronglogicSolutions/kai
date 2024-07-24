@@ -54,6 +54,8 @@ class endpoint : public kiq::IPCTransmitterInterface
     klog().d("Sending greeting to {}", get_addr());
 
     send_ipc_message(std::make_unique<kiq::status_check>());
+
+    daemon_.add_observer("kai", [this] { reconnect_ = true; });
   }
   //--------------------------------------------------------
   void recv(zmq::socket_t& socket)
@@ -99,16 +101,33 @@ class endpoint : public kiq::IPCTransmitterInterface
         recv(tx_);
       if (items[1].revents & ZMQ_POLLIN)
         recv(rx_);
+
+      if (reconnect_)
+      {
+        connect();
+        reconnect_ = false;
+      }
     }
   }
 
  protected:
   virtual zmq::socket_t& socket() final { return tx_; }
-  void on_done() final { (void)(0); }
+  void on_done() final
+  {
+    if (!daemon_.validate("kai"))
+    {
+      klog().t("Heartbeat resuming");
+      daemon_.reset();
+    }
+  }
 
  private:
+ using daemon_t = kiq::session_daemon;
+
   zmq::context_t    context_;
   zmq::socket_t     rx_;
   zmq::socket_t     tx_;
   ipc_msg_cb_t      on_recv_;
+  daemon_t   daemon_;
+  bool       reconnect_{false};
 };
