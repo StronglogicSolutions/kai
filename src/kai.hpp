@@ -42,6 +42,7 @@ class kai
     {
       { kiq::constants::IPC_KIQ_MESSAGE,  [this](auto&& ipc_msg)
         {
+          klog().d("Handling KIQ Message");
           const auto payload = get_payload(static_cast<kiq::kiq_message*>(ipc_msg.get())->payload());
 
           if (payload.type() == "generate")
@@ -55,6 +56,7 @@ class kai
       },
       { kiq::constants::IPC_PLATFORM_TYPE,  [this](auto&& ipc_msg)
         {
+          klog().d("Handling Platform Type Message");
           const auto p_msg = static_cast<kiq::platform_message*>(ipc_msg.get());
           generate(p_msg->content(), p_msg->id());
           messages_.insert_or_assign(p_msg->id(), std::move(ipc_msg));
@@ -63,9 +65,10 @@ class kai
       },
       { kiq::constants::IPC_STATUS,       [this](auto&& ipc_msg)
         {
-          klog().d("Received IPC_STATUS. Reconnecting");
+          klog().d("Received IPC_STATUS. Reconnecting"); // TODO: use endpoint::reconnect
           endpoint_.send_ipc_message(std::make_unique<kiq::okay_message>());
           endpoint_.connect();
+          endpoint_.send_ipc_message(make_hb());
         }
       },
       { kiq::constants::IPC_KEEPALIVE_TYPE,       [this](auto&&)
@@ -110,14 +113,21 @@ class kai
     // TODO: Do we need to set platform name here? or can KIQ determine that from a request map?
     klog().i("Sending {} this IPC: {}", endpoint_.get_addr(), out_msg->to_string());
 
-    endpoint_.send_ipc_message(std::move(out_msg));
+    endpoint_.send_ipc_message(std::move(out_msg)); // Use queue
   }
   //-----------------------------------------------------------------------------
   void generate(std::string_view s, std::string_view id = "")
   {
-    const auto response = post(s, url);
-    const auto value    = decode(response);
-    add(id, session::exchange_t{s, value});
+    std::future<void> fut = std::async(std::launch::async, [this, s, id]()
+    {
+      auto value = decode(post(s, url));
+      if (value.empty())
+      {
+        klog().d("Failed to generate a response. Trying once more");
+        value = decode(post(s, url));
+      }
+      add(id, session::exchange_t{s, value});
+    });
   }
 
  private:
