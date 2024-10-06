@@ -16,9 +16,8 @@ class endpoint : public kiq::IPCTransmitterInterface
   : context_(1),
   on_recv_(cb)
   {
-    connect();
-
     kiq::set_log_fn([](const auto& s) { klog().i("{}", s); });
+    connect();
   }
   //--------------------------------------------------------
   virtual ~endpoint() final
@@ -55,7 +54,16 @@ class endpoint : public kiq::IPCTransmitterInterface
 
     send_ipc_message(std::make_unique<kiq::status_check>());
 
-    daemon_.add_observer("kai", [this] { reconnect_ = true; });
+    daemon_.add_observer("kai", [this]
+    {
+      klog().w("Heartbeat timed out");
+      reconnect_ = true;
+    });
+  }
+  //--------------------------------------------------------
+  void reconnect()
+  {
+    reconnect_ = true;
   }
   //--------------------------------------------------------
   void recv(zmq::socket_t& socket)
