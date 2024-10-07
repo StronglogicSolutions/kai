@@ -97,7 +97,7 @@ class kai
     }
   })
   {
-    endpoint_.run();
+    run();
   }
 
   //-----------------------------------------------------------------------------
@@ -118,7 +118,8 @@ class kai
   //-----------------------------------------------------------------------------
   void generate(std::string_view s, std::string_view id = "")
   {
-    std::future<void> fut = std::async(std::launch::async, [this, s, id]()
+    klog().d("generate request received");
+    fut_ = std::async(std::launch::async, [this, s, id]()
     {
       auto value = decode(post(s, url));
       if (value.empty())
@@ -128,14 +129,31 @@ class kai
       }
       add(id, session::exchange_t{s, value});
     });
+    klog().d("Future created");
   }
 
  private:
   //-----------------------------------------------------------------------------
   bool has_session(uint32_t id) const { return sessions_.find(id) != sessions_.end(); }
+  void run()
+  {
+    while (true)
+    {
+      endpoint_.run();
+
+      if (fut_.valid())
+      {
+        klog().d("Rejoining worker thread");
+        fut_.get();
+      }
+    }
+  }
 
   //--------------------------
+  using fut_t = std::future<void>;
+
   sessions_t sessions_;
   endpoint   endpoint_;
   messages_t messages_;
+  fut_t      fut_;
 };

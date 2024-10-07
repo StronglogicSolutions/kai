@@ -69,6 +69,9 @@ callback(void *contents, size_t size, size_t nmemb, std::string *buffer)
 std::string
 decode(const std::string& response)
 {
+  if (response.empty())
+    return "";
+
   const size_t                       i_sz = response.size();
   const size_t                       size = i_sz + simdjson::SIMDJSON_PADDING;
   const auto                         data = simdjson::padded_string{response.data(), i_sz};
