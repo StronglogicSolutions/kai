@@ -116,9 +116,12 @@ class kai
     endpoint_.send_ipc_message(std::move(out_msg)); // Use queue
   }
   //-----------------------------------------------------------------------------
-  void generate(std::string_view s, std::string_view id = "")
+  void generate(const std::string& s, const std::string& id = "")
   {
     klog().d("generate request received");
+
+    generating_ = true;
+
     fut_ = std::async(std::launch::async, [this, s, id]()
     {
       auto value = decode(post(s, url));
@@ -127,7 +130,10 @@ class kai
         klog().d("Failed to generate a response. Trying once more");
         value = decode(post(s, url));
       }
+
       add(id, session::exchange_t{s, value});
+
+      generating_ = false;
     });
     klog().d("Future created");
   }
@@ -141,7 +147,7 @@ class kai
     {
       endpoint_.run();
 
-      if (fut_.valid())
+      if (fut_.valid() && !generating_)
       {
         klog().d("Rejoining worker thread");
         fut_.get();
@@ -156,4 +162,5 @@ class kai
   endpoint   endpoint_;
   messages_t messages_;
   fut_t      fut_;
+  bool       generating_{false};
 };
