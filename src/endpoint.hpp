@@ -95,26 +95,22 @@ class endpoint : public kiq::IPCTransmitterInterface
   run()
   {
     using namespace kiq;
-
     static const auto timeout   = std::chrono::milliseconds(300);
 
-    while (true)
+    uint8_t           poll_mask = {0x00};
+    zmq::pollitem_t   items[]   = { { tx_, 0, ZMQ_POLLIN, 0},
+                                    { rx_, 1, ZMQ_POLLIN, 0} };
+    zmq::poll(&items[0], 2, timeout);
+
+    if (items[0].revents & ZMQ_POLLIN)
+      recv(tx_);
+    if (items[1].revents & ZMQ_POLLIN)
+      recv(rx_);
+
+    if (reconnect_)
     {
-      uint8_t           poll_mask = {0x00};
-      zmq::pollitem_t   items[]   = { { tx_, 0, ZMQ_POLLIN, 0},
-                                      { rx_, 1, ZMQ_POLLIN, 0} };
-      zmq::poll(&items[0], 2, timeout);
-
-      if (items[0].revents & ZMQ_POLLIN)
-        recv(tx_);
-      if (items[1].revents & ZMQ_POLLIN)
-        recv(rx_);
-
-      if (reconnect_)
-      {
-        connect();
-        reconnect_ = false;
-      }
+      connect();
+      reconnect_ = false;
     }
   }
 
@@ -136,6 +132,6 @@ class endpoint : public kiq::IPCTransmitterInterface
   zmq::socket_t     rx_;
   zmq::socket_t     tx_;
   ipc_msg_cb_t      on_recv_;
-  daemon_t   daemon_;
-  bool       reconnect_{false};
+  daemon_t          daemon_;
+  bool              reconnect_{false};
 };
