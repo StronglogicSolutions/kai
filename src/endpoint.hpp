@@ -109,6 +109,11 @@ class endpoint : public kiq::IPCTransmitterInterface
 
     if (reconnect_)
     {
+      rx_.close();
+      tx_.close();
+
+      std::this_thread::sleep_for(timeout);
+
       connect();
       reconnect_ = false;
     }

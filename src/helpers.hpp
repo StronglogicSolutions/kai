@@ -117,8 +117,9 @@ get_payload(const std::string& response)
 }
 //--------------------------------------------------------
 std::string
-post(std::string_view query, std::string_view url)
+post(const std::string& query, const std::string& url)
 {
+  klog().d("Post request to {} with query {}", url, query);
   std::string response;
   const auto  data = make_query(get_sanitized_string(query));
   if (curl_t *curl = curl_easy_init(); curl)
