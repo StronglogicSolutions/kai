@@ -5,8 +5,7 @@
 
 using namespace kiq::log;
 static const char* RX_ADDR{"tcp://0.0.0.0:28485"};
-static const char* TX_ADDR{"tcp://172.105.11.218:28474"};
-// static const char* TX_ADDR{"tcp://0.0.0.0:28474"};
+static const char* TX_ADDR{"tcp://0.0.0.0:28474"};
 
 using ipc_msg_cb_t = std::function<void(kiq::ipc_message::u_ipc_msg_ptr)>;
 
@@ -96,11 +95,8 @@ class endpoint : public kiq::IPCTransmitterInterface
   run()
   {
     using namespace kiq;
-
     static const auto timeout   = std::chrono::milliseconds(300);
 
-    
-    
     uint8_t           poll_mask = {0x00};
     zmq::pollitem_t   items[]   = { { tx_, 0, ZMQ_POLLIN, 0},
                                     { rx_, 1, ZMQ_POLLIN, 0} };
@@ -136,6 +132,6 @@ class endpoint : public kiq::IPCTransmitterInterface
   zmq::socket_t     rx_;
   zmq::socket_t     tx_;
   ipc_msg_cb_t      on_recv_;
-  daemon_t   daemon_;
-  bool       reconnect_{false};
+  daemon_t          daemon_;
+  bool              reconnect_{false};
 };
