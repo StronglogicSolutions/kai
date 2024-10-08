@@ -40,51 +40,40 @@ class kai
     // ☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰Request Handlers☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰
     const auto handler = handler_t
     {
-      { kiq::constants::IPC_KIQ_MESSAGE,  [this](auto&& ipc_msg)
+      { kiq::constants::IPC_KIQ_MESSAGE,    [this](auto&& ipc_msg) //--------------------------------
         {
-          klog().d("Handling KIQ Message");
-          const auto payload = get_payload(static_cast<kiq::kiq_message*>(ipc_msg.get())->payload());
-
-          if (payload.type() == "generate")
-          {
-            generate(payload.data(), last_msg_idx);
-            messages_.insert_or_assign(last_msg_idx, std::move(ipc_msg));
-          }
-          else
-            klog().w("Received unknown request name: {}", payload.type());
+          klog().d("KIQ msg ignored: {}", ipc_msg->to_string());
         }
       },
-      { kiq::constants::IPC_PLATFORM_TYPE,  [this](auto&& ipc_msg)
+      { kiq::constants::IPC_KEEPALIVE_TYPE, [this](auto&&)         //--------------------------------
+        {
+          static unsigned int hb_count = 0;
+
+          if (++hb_count % 400 == 0)
+            klog().t("Heartbeats: {}", hb_count);
+          endpoint_.send_ipc_message(make_hb());
+        }
+      },
+      { kiq::constants::IPC_OK_TYPE,        [this](auto&&)         //--------------------------------
+        {
+          klog().d("Received OKAY from KIQ");
+        }
+      },
+      { kiq::constants::IPC_PLATFORM_TYPE,  [this](auto&& ipc_msg) //--------------------------------
         {
           klog().d("Handling Platform Type Message");
           const auto p_msg = static_cast<kiq::platform_message*>(ipc_msg.get());
           generate(p_msg->content(), p_msg->id());
           messages_.insert_or_assign(p_msg->id(), std::move(ipc_msg));
-          // TODO: The stored message should have the name of the destination platform
         }
       },
-      { kiq::constants::IPC_STATUS,       [this](auto&& ipc_msg)
+      { kiq::constants::IPC_STATUS,         [this](auto&&)         //--------------------------------
         {
-          klog().d("Received IPC_STATUS. Reconnecting"); // TODO: use endpoint::reconnect
+          klog().d("Received IPC_STATUS. Reconnecting");
           endpoint_.send_ipc_message(std::make_unique<kiq::okay_message>());
-          endpoint_.connect();
-          endpoint_.send_ipc_message(make_hb());
+          endpoint_.reconnect();
         }
       },
-      { kiq::constants::IPC_KEEPALIVE_TYPE,       [this](auto&&)
-        {
-          static unsigned int hb_count = 0;
-          if (++hb_count % 400 == 0)
-            klog().t("Heartbeats: {}", hb_count);
-
-          endpoint_.send_ipc_message(make_hb());
-        }
-      },
-      { kiq::constants::IPC_OK_TYPE,       [this](auto&&)
-        {
-          klog().d("Received OKAY from KIQ");
-        }
-      }
     };
     // ☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰☰
     try
@@ -110,10 +99,9 @@ class kai
     sessions_.at(g_id).dialogue.push_back(exchange);
 
     auto&& out_msg = std::make_unique<info_t>("sentinel", exchange.second, "generated", id.data());
-    // TODO: Do we need to set platform name here? or can KIQ determine that from a request map?
     klog().i("Sending {} this IPC: {}", endpoint_.get_addr(), out_msg->to_string());
 
-    endpoint_.send_ipc_message(std::move(out_msg)); // Use queue
+    endpoint_.send_ipc_message(std::move(out_msg));
   }
   //-----------------------------------------------------------------------------
   void generate(const std::string& s, const std::string& id = "")
@@ -135,6 +123,7 @@ class kai
 
       generating_ = false;
     });
+
     klog().d("Future created");
   }
 
