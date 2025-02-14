@@ -1,7 +1,14 @@
 #include <variant>
-#include "helpers.hpp"
-#include <concepts>
 #include <type_traits>
+#include <functional>
+#include <string>
+
+enum class type
+{
+  spike = 0x00,
+  development = 0x01,
+  defect = 0x02
+};
 
 template <typename... Ts>
 struct overloaded : Ts... {
@@ -9,56 +16,6 @@ struct overloaded : Ts... {
 };
 
 using args_t = std::vector<std::string>;
-class task
-{
-  public:
-    enum class type
-    {
-      spike = 0x00,
-      development = 0x01,
-      defect = 0x02
-    };
-    task(type task_type)
-    : type_(task_type)
-    {
-      auto create_task = [](const auto& name)
-      {
-        // 1. create fs
-        //
-        // defect/<name>
-        // defect/<name>/info.md
-        // defect/<name>/logs/{console,debug,recovery}
-        // defect/<name>/steps/<date.md>
-        //
-        // 2. identify technologies
-        //
-        // 3. identify question
-        //
-        // 4. known/solvable?
-        //   - try to solve 
-        //   - evaluate solution and ask
-        //
-        // 5. 
-      };
-      switch (type_)
-      {
-        case type::spike:
-
-        break;
-        case type::development:
-
-        break;
-
-        case type::defect:
-
-        break;
-      }
-    }
-
-  private:
-    type type_;
-};
-
 
 template <typename... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
@@ -73,24 +30,40 @@ decltype(auto) visit(F&& f, Variants&&... variants)
   return std::visit(std::forward<F>(f), std::forward<Variants>(variants)...);
 }
 
+using defct_fn_t = std::function<void(std::integral_constant<type, type::defect>)>;
+using spike_fn_t = std::function<void(std::integral_constant<type, type::spike>)>;
+using devel_fn_t = std::function<void(std::integral_constant<type, type::development>)>;
+
+using overloaded_vis_t = overloaded<defct_fn_t, devel_fn_t, spike_fn_t>;
+
 class delegate
 {
-  private:
-    void work()
+  public:
+    delegate()
+    : visitor_(make_visitor())
+    {}
+
+    static overloaded_vis_t make_visitor()
     {
-      auto visitor = overloaded{
-      [](std::integral_constant<task::type, task::type::defect>)
-      {
-
-      },
-      [](std::integral_constant<task::type, task::type::development>)
-      {
-
-      },
-      [](std::integral_constant<task::type, task::type::spike>)
-      {
-
-      }
+      return overloaded{
+        defct_fn_t{[](std::integral_constant<type, type::defect>) {
+        }},
+        devel_fn_t{[](std::integral_constant<type, type::development>) {
+        }},
+        spike_fn_t{[](std::integral_constant<type, type::spike>) {
+        }}
       };
     }
+
+    void process(auto type, auto info)
+    {
+      visit(type);
+    }
+
+  private:
+    void work() {}
+
+    using visitor_t = decltype(make_visitor());
+
+    visitor_t visitor_;
 };
