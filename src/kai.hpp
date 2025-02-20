@@ -5,6 +5,8 @@
 #include <vector>
 #include <exception>
 #include "endpoint.hpp"
+#include "helpers.hpp"
+#include "delegate.hpp"
 
 using namespace kiq::log;
 //--------------------------------------------------------
@@ -152,4 +154,5 @@ class kai
   messages_t messages_;
   fut_t      fut_;
   bool       generating_{false};
+  delegate   delegate_;
 };

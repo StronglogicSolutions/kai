@@ -1,69 +1,87 @@
+#pragma once
+
 #include <variant>
 #include <type_traits>
 #include <functional>
-#include <string>
+#include <kproto/ipc.hpp>
 
-enum class type
+//-------------------------------------------------------------------------------------------------
+enum class task_t
 {
-  spike = 0x00,
+  spike       = 0x00,
   development = 0x01,
-  defect = 0x02
+  defect      = 0x02
 };
-
-template <typename... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
-
-using args_t = std::vector<std::string>;
-
-template <typename... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
-
-template <typename F, typename... Variants>
-concept invocablewith = (requires(F f, Variants... vars) { std::visit(f, vars...); });
-
-template <typename F, typename... Variants>
-requires invocablewith<F, Variants...>
-decltype(auto) visit(F&& f, Variants&&... variants)
+//-------------------------------------------------------------------------------------------------
+using task_variant_t = std::variant<
+  std::monostate,
+  std::integral_constant<task_t, task_t::spike>,
+  std::integral_constant<task_t, task_t::development>,
+  std::integral_constant<task_t, task_t::defect>>;
+//-------------------------------------------------------------------------------------------------
+using ipc_ptr_t  = kiq::task*;
+using defct_constant = std::integral_constant<task_t, task_t::defect>;
+using spike_constant = std::integral_constant<task_t, task_t::spike>;
+using devel_constant = std::integral_constant<task_t, task_t::development>;
+using defct_fn_t = std::function<void(defct_constant, ipc_ptr_t)>;
+using spike_fn_t = std::function<void(spike_constant, ipc_ptr_t)>;
+using devel_fn_t = std::function<void(devel_constant, ipc_ptr_t)>;
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+static task_variant_t to_variant(task_t task_type)
 {
-  return std::visit(std::forward<F>(f), std::forward<Variants>(variants)...);
+    switch (task_type)
+    {
+        case task_t::spike:        return std::integral_constant<task_t, task_t::spike>{};
+        case task_t::development:  return std::integral_constant<task_t, task_t::development>{};
+        case task_t::defect:       return std::integral_constant<task_t, task_t::defect>{};
+        default:                   return std::monostate{};
+    }
 }
-
-using defct_fn_t = std::function<void(std::integral_constant<type, type::defect>)>;
-using spike_fn_t = std::function<void(std::integral_constant<type, type::spike>)>;
-using devel_fn_t = std::function<void(std::integral_constant<type, type::development>)>;
-
-using overloaded_vis_t = overloaded<defct_fn_t, devel_fn_t, spike_fn_t>;
-
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+class task_handler
+{
+  public:
+    void operator()(defct_constant, ipc_ptr_t msg) const
+    {
+    }
+    //-------------------------------
+    void operator()(spike_constant, ipc_ptr_t msg) const
+    {
+    }
+    //-------------------------------
+    void operator()(devel_constant, ipc_ptr_t msg) const
+    {
+    }
+    //-------------------------------
+    void operator()(std::monostate, ipc_ptr_t msg) const
+    {
+    }
+};
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 class delegate
 {
   public:
-    delegate()
-    : visitor_(make_visitor())
-    {}
-
-    static overloaded_vis_t make_visitor()
+    //-------------------------------
+    void process(kiq::ipc_message::u_ipc_msg_ptr u_ipc_msg, task_t type_of_task)
     {
-      return overloaded{
-        defct_fn_t{[](std::integral_constant<type, type::defect>) {
-        }},
-        devel_fn_t{[](std::integral_constant<type, type::development>) {
-        }},
-        spike_fn_t{[](std::integral_constant<type, type::spike>) {
-        }}
-      };
+      auto* msg = static_cast<ipc_ptr_t>(u_ipc_msg.get());
+      std::visit(
+        [msg](auto task_type) { handler_(task_type, msg); },
+        to_variant(type_of_task));
     }
-
-    void process(auto type, auto info)
-    {
-      visit(type);
-    }
-
+    //-------------------------------
   private:
-    void work() {}
-
-    using visitor_t = decltype(make_visitor());
-
-    visitor_t visitor_;
+    static inline task_handler handler_{};
 };
+
+// for DEFECT:
+// - types of technologies
+// - description of issue
+// - description of standard by which this issue would be solved
+// - technologies
+// - logs
+//
