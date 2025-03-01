@@ -32,6 +32,7 @@ class kai
 
   kai()
   : endpoint_([this](kiq::ipc_message::u_ipc_msg_ptr msg)
+
   {
     using handler_t = std::map<uint8_t, std::function<void(kiq::ipc_message::u_ipc_msg_ptr)>>;
 
@@ -65,10 +66,17 @@ class kai
         {
           klog().d("Handling Platform Type Message");
           const auto p_msg = static_cast<kiq::platform_message*>(ipc_msg.get());
-          generate(p_msg->content(), p_msg->id());
+          generate(p_msg->content(), p_msg->id()); // TODO: we should use a queue
           messages_.insert_or_assign(p_msg->id(), std::move(ipc_msg));
         }
       },
+      { kiq::constants::IPC_TASK_TYPE,  [this](auto&& ipc_msg) //--------------------------------
+        {
+          klog().d("Handling Task Request");
+          delegate_.process(std::move(ipc_msg), task_t::defect);
+        }
+      },
+
       { kiq::constants::IPC_STATUS,         [this](auto&&)         //--------------------------------
         {
           klog().d("Received IPC_STATUS. Reconnecting");
@@ -86,7 +94,8 @@ class kai
     {
       klog().e("Caught exception while handling IPC: {}", e.what());
     }
-  })
+  }),
+  delegate_([this](auto prompt) { generate(prompt.data(), "delegate_placeholder_ID"); })
   {
     run();
   }
