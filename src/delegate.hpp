@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <variant>
 #include <type_traits>
 #include <functional>
@@ -28,6 +29,8 @@ using defct_fn_t = std::function<void(defct_constant, ipc_ptr_t)>;
 using spike_fn_t = std::function<void(spike_constant, ipc_ptr_t)>;
 using devel_fn_t = std::function<void(devel_constant, ipc_ptr_t)>;
 using genrt_fn_t = std::function<void(std::string_view)>;
+using pending_queue_t = std::deque<std::string>;
+using req_fn_t   = std::function<void(std::string)>;
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 static task_variant_t to_variant(task_t task_type)
@@ -46,6 +49,11 @@ static task_variant_t to_variant(task_t task_type)
 class task_handler
 {
   public:
+    task_handler(req_fn_t fn)
+    : request_generation(fn)
+    {
+    }
+
     void operator()(defct_constant, ipc_ptr_t msg) const
     {
       auto tech = msg->tech();
@@ -77,6 +85,8 @@ class task_handler
     void operator()(std::monostate, ipc_ptr_t msg) const
     {
     }
+  private:
+    req_fn_t request_generation;
 };
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -92,13 +102,24 @@ class delegate
     {
       auto* msg = static_cast<ipc_ptr_t>(u_ipc_msg.get());
       std::visit(
-        [msg](auto task_type) { handler_(task_type, msg); },
+        [this, msg](auto task_type) { handler_(task_type, msg); },
         to_variant(type_of_task));
     }
     //-------------------------------
+    void on_generation(const std::string& generated)
+    {
+      if (queue_.empty())
+        (void)("We have an error!");
+
+      auto prompt = queue_.front();
+      queue_.pop_front();
+      // TODO: Handle the response
+    }
   private:
-    static inline task_handler handler_{};
-    genrt_fn_t    gen_fn_;
+    task_handler handler_{[this](std::string s) { queue_.push_back(s); gen_fn_(s); }};
+    genrt_fn_t                 gen_fn_;
+    pending_queue_t            queue_;
+
 };
 
 // for DEFECT:

@@ -11,6 +11,7 @@
 using namespace kiq::log;
 //--------------------------------------------------------
 static const char* url = "http://127.0.0.1:8080/completion"; // LLAMA AI SERVER
+static constexpr std::string_view g_del_id = "delegate_placeholder_ID";
 //--------------------------------------------------------
 static const uint32_t g_id = 123;
 //--------------------------------------------------------
@@ -95,7 +96,7 @@ class kai
       klog().e("Caught exception while handling IPC: {}", e.what());
     }
   }),
-  delegate_([this](auto prompt) { generate(prompt.data(), "delegate_placeholder_ID"); })
+  delegate_([this](auto prompt) { generate(prompt.data(), g_del_id.data()); })
   {
     run();
   }
@@ -130,7 +131,10 @@ class kai
         value = decode(post(s, url));
       }
 
-      add(id, session::exchange_t{s, value});
+      if (id != g_del_id.data())
+        add(id, session::exchange_t{s, value});
+      else
+        delegate_.on_generation(s);
 
       generating_ = false;
     });
