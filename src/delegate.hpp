@@ -4,6 +4,7 @@
 #include <type_traits>
 #include <functional>
 #include <kproto/ipc.hpp>
+#include "kutils.hpp"
 
 //-------------------------------------------------------------------------------------------------
 enum class task_t
@@ -26,6 +27,7 @@ using devel_constant = std::integral_constant<task_t, task_t::development>;
 using defct_fn_t = std::function<void(defct_constant, ipc_ptr_t)>;
 using spike_fn_t = std::function<void(spike_constant, ipc_ptr_t)>;
 using devel_fn_t = std::function<void(devel_constant, ipc_ptr_t)>;
+using genrt_fn_t = std::function<void(std::string_view)>;
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 static task_variant_t to_variant(task_t task_type)
@@ -46,6 +48,22 @@ class task_handler
   public:
     void operator()(defct_constant, ipc_ptr_t msg) const
     {
+      auto tech = msg->tech();
+      auto logs = msg->logs();
+      auto desc = msg->description();
+
+      auto blame_tech = [tech, desc]
+      {
+        std::string identified;
+        auto technologies = kutils::split(tech, '<');
+        for (const auto& tech : technologies)
+          ;// TODO: ask AI if tech is likely the problem
+        return identified;
+      };
+
+      auto solved_or_easy = [tech, desc, logs]
+      {
+      };
     }
     //-------------------------------
     void operator()(spike_constant, ipc_ptr_t msg) const
@@ -65,6 +83,10 @@ class task_handler
 class delegate
 {
   public:
+
+    delegate(genrt_fn_t fn)
+    : gen_fn_(fn)
+    {}
     //-------------------------------
     void process(kiq::ipc_message::u_ipc_msg_ptr u_ipc_msg, task_t type_of_task)
     {
@@ -76,6 +98,7 @@ class delegate
     //-------------------------------
   private:
     static inline task_handler handler_{};
+    genrt_fn_t    gen_fn_;
 };
 
 // for DEFECT:
