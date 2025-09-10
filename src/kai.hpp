@@ -8,7 +8,6 @@
 #include "helpers.hpp"
 #include "delegate.hpp"
 
-using namespace kiq::log;
 //--------------------------------------------------------
 static const char* url = "http://127.0.0.1:8080/completion"; // LLAMA AI SERVER
 static constexpr std::string_view g_del_id = "delegate_placeholder_ID";
@@ -124,17 +123,17 @@ class kai
 
     fut_ = std::async(std::launch::async, [this, s, id]()
     {
-      auto value = decode(post(s, url));
+      auto value = process_llm_comment(s);
       if (value.empty())
       {
         klog().d("Failed to generate a response. Trying once more");
-        value = decode(post(s, url));
+        value = process_llm_comment(s);
       }
 
       if (id != g_del_id.data())
         add(id, session::exchange_t{s, value});
       else
-        delegate_.on_generation(s);
+        delegate_.on_generation(value);
 
       generating_ = false;
     });
@@ -147,6 +146,7 @@ class kai
   bool has_session(uint32_t id) const { return sessions_.find(id) != sessions_.end(); }
   void run()
   {
+    bool tested = false;
     while (true)
     {
       endpoint_.run();
@@ -155,7 +155,11 @@ class kai
       {
         klog().d("Rejoining worker thread");
         fut_.get();
+        klog().t("Finished rejoining thread");
       }
+
+      if (!tested)
+        tested = delegate_.do_test();
     }
   }
 
@@ -169,3 +173,5 @@ class kai
   bool       generating_{false};
   delegate   delegate_;
 };
+
+// KAI Show me how to implement a semaphore

@@ -1,12 +1,16 @@
 #pragma once
 
 #include <deque>
+#include <memory>
+#include <stdexcept>
+#include <string>
 #include <variant>
 #include <type_traits>
 #include <functional>
 #include <kproto/ipc.hpp>
 #include "helpers.hpp"
 #include "task_utils.hpp"
+
 
 //-------------------------------------------------------------------------------------------------
 enum class task_t
@@ -15,7 +19,7 @@ enum class task_t
   development = 0x01,
   defect      = 0x02
 };
-//-------------------------------------------------------------------------------------------------
+
 using task_variant_t = std::variant<
   std::monostate,
   std::integral_constant<task_t, task_t::spike>,
@@ -56,67 +60,39 @@ task_handler(req_fn_t fn)
 
 void operator()(defct_constant, ipc_ptr_t msg) const
 {
-    auto tech = msg->tech();
-    auto logs = msg->logs();
-    auto desc = msg->description();
-    std::string my_string;
-    auto val = msg->platform();
-    //auto identified_tech = [tech, desc]
-    //{
-    //    std::string identified;
-    //    auto technologies = kutils::split(tech, '<');
-    //    for (const auto& tech : technologies)
-    //        identified += " - " + tech;
-    //    return identified;
-    //}();
+    const auto tech = msg->tech();
+    const auto logs = msg->logs();
+    const auto desc = msg->description();
 
-    //auto solution_description = [logs, desc]
-    //{
-    //    std::string description;
-    //    // TODO: Add logic to generate a solution description based on logs and issue description
-    //    return description;
-    //}();
+    const auto& result = search_google(tech);
 
-    //auto final_report = [identified_tech, solution_description, desc]
-    //{
-    //    std::string report;
-    //    report += "Defect identified:\n";
-    //    report += identified_tech + "\n";
-    //    report += "Description:\n";
-    //    report += desc + "\n";
-    //    report += "Solution:\n";
-    //    report += solution_description + "\n";
-    //    return report;
-    //}();
+    if (result.empty())
+      throw std::runtime_error("Failed to get search response");
 
-     // Construct the query and URL for the Google search
-    std::string queryStr = "tech:" + tech;
-    std::string urlStr = "https://www.google.com/search?q=" + queryStr;
-
-    // Make the HTTP request
-    std::string response = post(queryStr, urlStr);
-
-    // Parse the response
-    if (is_english(response) && is_recent(find_recent_date(response)))
+    std::string prompt;
+    for (const auto& value : result)
     {
-        // Compose the prompt to request generation
-        std::string prompt = "We have a problem involving '" + tech + "'. The problem can be described as '" + desc + "'. The logs from an occurrence of this problem are '" + logs + "'. Please generate a solution.";
-        std::cout << "Generated prompt: " << prompt << std::endl;
+      klog().d("Search result: {} : {}", value.title, value.snippet);
+      if (is_english(value.title) && is_recent(find_recent_date(value.snippet)))
+      {
+          prompt = "We have a problem involving '" + tech + "'. The problem can be described as '" + desc + "'. The logs from an occurrence of this problem are '" + logs + "'. Please generate a solution.";
+          klog().i("Generated prompt: {}", prompt);
+      }
+      else
+        klog().e("The results are not in English or are not recent.");
     }
+
+    if (prompt.empty())
+      klog().e("No prompt generated");
     else
-      std::cout << "The results are not in English or are not recent." << std::endl;
-
-    std::string final_report;
-
-    request_generation(final_report);
+      request_generation(prompt);
 }
 
-void operator()(spike_constant, ipc_ptr_t msg) const
+void operator()(spike_constant, ipc_ptr_t msg) const // NOTE: SPIKE
 {
-    // Handle spike tasks (e.g., quick experiments, small code changes)
-    auto tech = msg->tech();
-     auto logs = msg->logs();
-    auto desc = msg->description();
+    const auto tech = msg->tech();
+    const auto logs = msg->logs();
+    const auto desc = msg->description();
 
     auto final_report = [logs, desc]
     {
@@ -126,16 +102,15 @@ void operator()(spike_constant, ipc_ptr_t msg) const
         report += desc + "\n";
         report += "Logs:\n";
         report += logs + "\n";
+
         return report;
     }();
 
-    // Handle the report (e.g., send it to a logging system, display it, etc.)
     request_generation(final_report);
 }
 
-void operator()(devel_constant, ipc_ptr_t msg) const
+void operator()(devel_constant, ipc_ptr_t msg) const // NOTE: DEVELOPMENT
 {
-    // Handle development tasks (e.g., new features, improvements)
     auto tech = msg->tech();
     auto logs = msg->logs();
     auto desc = msg->description();
@@ -153,13 +128,11 @@ void operator()(devel_constant, ipc_ptr_t msg) const
         return report;
     }();
 
-    // Handle the report (e.g., send it to a logging system, display it, etc.)
     request_generation(final_report);
 }
 
-void operator()(std::monostate, ipc_ptr_t msg) const
+void operator()(std::monostate, ipc_ptr_t msg) const // WARNING: UNKNOWN
 {
-    // Handle unknown or invalid tasks
     auto tech = msg->tech();
     auto logs = msg->logs();
     auto desc = msg->description();
@@ -177,7 +150,6 @@ void operator()(std::monostate, ipc_ptr_t msg) const
         return report;
     }();
 
-    // Handle the report (e.g., send it to a logging system, display it, etc.)
     request_generation(final_report);
 }
 private:
@@ -190,7 +162,7 @@ public:
 delegate(genrt_fn_t fn)
 : gen_fn_(fn)
 {}
-
+//---------------
 void process(kiq::ipc_message::u_ipc_msg_ptr u_ipc_msg, task_t type_of_task)
 {
     auto* msg = static_cast<ipc_ptr_t>(u_ipc_msg.get());
@@ -198,18 +170,31 @@ void process(kiq::ipc_message::u_ipc_msg_ptr u_ipc_msg, task_t type_of_task)
         [this, msg](auto task_type) { handler_(task_type, msg); },
         to_variant(type_of_task));
 }
+//---------------
+bool do_test()
+{
+  task_t type = task_t::defect;
+  kiq::task req{"my ID","this is my description", "Defect", "CEF", "log1,log2"};
+  process(std::make_unique<kiq::ipc_message>(req), type);
 
+  return true;
+}
+//---------------
 void on_generation(const std::string& generated)
 {
-    if (queue_.empty())
-        (void)("We have an error!");
+  if (queue_.empty())
+    throw std::runtime_error(
+      std::string{"Genertion received, but queue is empty! Generated: {}" + generated});
 
-    auto prompt = queue_.front();
-    queue_.pop_front();
+  auto prompt = queue_.front();
+  queue_.pop_front();
+  klog().t("\nOriginal prompt: {}\nGenerated response: {}", prompt, generated);
     // TODO: Handle the response
 }
+//---------------
+//---------------
 private:
-task_handler handler_{[this](std::string s) { queue_.push_back(s); gen_fn_(s); }};
-genrt_fn_t gen_fn_;
-pending_queue_t queue_;
+  task_handler    handler_{[this](auto s) { queue_.push_back(s); gen_fn_(s); }};
+  genrt_fn_t      gen_fn_;
+  pending_queue_t queue_;
 };
